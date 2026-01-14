@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>暗棋 - 消防栓與火焰炮 (完美比例版)</title>
+    <title>暗棋 - 終極技能大亂鬥 (電腦版優化)</title>
     <style>
         :root {
             --board-bg: #e6cca0;
@@ -13,6 +13,9 @@
             --valid-capture: rgba(231, 76, 60, 0.6);
             --valid-skill: rgba(52, 152, 219, 0.6);
             --valid-cannon-skill: rgba(230, 126, 34, 0.7);
+            --valid-storm-skill: rgba(142, 68, 173, 0.6);
+            --valid-gold-skill: rgba(241, 196, 15, 0.8);
+            --valid-nitro-skill: rgba(0, 206, 201, 0.7);
             --valid-dark-attack: rgba(230, 126, 34, 0.6);
             --ui-bg: #2c3e50;
             --panel-bg: rgba(0, 0, 0, 0.3);
@@ -23,7 +26,8 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "bikai", "KaiTi", "DFKai-SB", serif;
             background-color: var(--ui-bg);
             margin: 0; padding: 0;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            display: flex; flex-direction: column; align-items: center; 
+            /* Full viewport height */
             height: 100vh; height: 100dvh; width: 100vw;
             overflow: hidden; color: white;
             user-select: none; -webkit-user-select: none;
@@ -51,23 +55,30 @@
         .btn-blue { background: #3498db; box-shadow: 0 5px 0 #2980b9; }
         .btn-green { background: #2ecc71; box-shadow: 0 5px 0 #27ae60; }
 
-        /* --- Layout Grid --- */
-        #game-layout {
+        /* --- Main Layout Wrapper --- */
+        /* This wrapper handles the flex direction switch between Mobile (Column) and Desktop (Row) */
+        #main-wrapper {
             display: flex;
-            flex-direction: column; /* Default Mobile: Vertical */
-            width: 100%; height: 100%;
-            max-width: 100%;
+            flex-direction: column;
+            width: 100%;
+            flex: 1; /* Take all available space above controls */
+            min-height: 0; /* Important for nested flex scroll */
+            padding: 5px;
             box-sizing: border-box;
-            padding-bottom: var(--safe-bottom);
+            justify-content: center;
+            align-items: center;
         }
 
-        /* --- Panels (Graveyards) --- */
+        /* --- Side Panels (Graveyards) --- */
         .side-panel {
             flex: 0 0 auto;
-            display: flex; flex-direction: column;
+            display: flex;
+            flex-direction: column;
             justify-content: center; align-items: center;
-            padding: 5px; box-sizing: border-box;
+            padding: 5px;
+            box-sizing: border-box;
             z-index: 10;
+            width: 100%; /* Mobile default */
         }
 
         #status-bar { display: flex; justify-content: center; padding: 5px 0; width: 100%; }
@@ -81,14 +92,10 @@
         .turn-indicator.active-black { background: black; color: white; border-color: #7f8c8d; box-shadow: 0 0 10px white; }
 
         .graveyard-box {
-            background: var(--panel-bg);
-            border: 1px solid #5c4033; border-radius: 8px;
-            display: flex; gap: 5px; padding: 5px;
-            box-sizing: border-box;
-            /* Mobile defaults */
-            width: 100%; height: 45px; 
-            overflow-x: auto; overflow-y: hidden;
-            align-items: center;
+            background: var(--panel-bg); border: 1px solid #5c4033; border-radius: 8px;
+            display: flex; gap: 5px; padding: 5px; box-sizing: border-box;
+            width: 100%; height: 45px; /* Mobile fixed height */
+            overflow-x: auto; overflow-y: hidden; align-items: center;
         }
         .graveyard-box::-webkit-scrollbar { height: 0px; width: 0px; }
 
@@ -96,8 +103,7 @@
             width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
             background-color: #f3e5ab; color: #000;
             display: flex; justify-content: center; align-items: center;
-            font-size: 18px; font-weight: bold; border: 2px solid #8b4513;
-            position: relative;
+            font-size: 18px; font-weight: bold; border: 2px solid #8b4513; position: relative;
         }
         .graveyard-piece.red { color: var(--piece-red); border-color: var(--piece-red); }
         .graveyard-piece.black { color: var(--piece-black); border-color: var(--piece-black); }
@@ -106,24 +112,25 @@
 
         /* --- Board Area --- */
         .board-container {
-            flex: 1 1 auto;
+            flex: 1; /* Grow to fill space */
+            min-height: 0; min-width: 0; /* Allow shrinking */
             display: flex; justify-content: center; align-items: center;
-            padding: 10px; overflow: hidden; position: relative;
+            padding: 5px; 
+            width: 100%;
         }
 
         #board {
-            /* Logic: Always maintain 1:2 ratio. */
+            /* Strict Aspect Ratio 1:2 */
             aspect-ratio: 4/8;
-            /* Mobile Default: Fit width mostly, but constrained by height */
-            height: 100%; 
+            /* Try to fill height first, but limit by width */
+            height: 100%;
             width: auto;
             max-width: 100%;
             
             background-color: var(--board-bg);
             border: 4px solid #5c4033; border-radius: 8px;
             display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(8, 1fr);
-            gap: 1px; box-shadow: 0 5px 20px rgba(0,0,0,0.6);
-            position: relative;
+            gap: 1px; box-shadow: 0 5px 20px rgba(0,0,0,0.6); position: relative;
         }
 
         .cell {
@@ -137,13 +144,10 @@
             background: #f3e5ab; border: 2px solid #8b4513;
             box-shadow: inset 2px 2px 5px rgba(255,255,255,0.4), 1px 1px 3px rgba(0,0,0,0.4);
             display: flex; justify-content: center; align-items: center;
-            /* Font size logic: use container query units or clamp based on min dimension */
-            font-size: clamp(16px, 5cqw, 40px); /* Fallback */
-            font-weight: bold; user-select: none;
+            font-size: clamp(16px, 5cqw, 40px); font-weight: bold; user-select: none;
             position: absolute; z-index: 10;
             transition: transform 0.2s, top 0.2s, left 0.2s;
         }
-        /* JS will set font size dynamically for better precision */
         
         .piece.hidden {
             background: radial-gradient(circle, #8b4513 30%, #5c4033 100%);
@@ -153,6 +157,20 @@
         .piece.red { color: var(--piece-red); }
         .piece.black { color: var(--piece-black); }
         .piece.selected { transform: scale(1.15); z-index: 20; box-shadow: 0 0 0 3px #f1c40f, 0 0 10px #f1c40f; }
+
+        /* Invincible State */
+        .piece.invincible {
+            border-color: #f1c40f;
+            box-shadow: 0 0 10px #f1c40f, 0 0 20px #f39c12, inset 0 0 10px #fff;
+            animation: golden-pulse 1.5s infinite alternate;
+        }
+        .piece.invincible::after {
+            content: '🛡️'; position: absolute; top: -5px; right: -5px; font-size: 0.8rem; z-index: 25;
+        }
+        @keyframes golden-pulse {
+            0% { box-shadow: 0 0 10px #f1c40f, 0 0 20px #f39c12; transform: scale(1); }
+            100% { box-shadow: 0 0 20px #f1c40f, 0 0 40px #f39c12; transform: scale(1.02); }
+        }
 
         .piece.firefighter {
             border-width: 3px; display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1;
@@ -166,6 +184,11 @@
         .charge-pip { width: 5px; height: 5px; border-radius: 50%; background: #ccc; border: 1px solid #777; }
         .charge-pip.on { background: #3498db; border-color: #2980b9; box-shadow: 0 0 3px #3498db; }
         .charge-pip.cannon-on { background: #e67e22; border-color: #d35400; box-shadow: 0 0 3px #e67e22; }
+        .charge-pip.storm-on { background: #9b59b6; border-color: #8e44ad; box-shadow: 0 0 3px #9b59b6; }
+        .charge-pip.gold-on { background: #f1c40f; border-color: #f39c12; box-shadow: 0 0 3px #f1c40f; }
+        .charge-pip.elephant-on { background: #2ecc71; border-color: #27ae60; box-shadow: 0 0 3px #2ecc71; }
+        .charge-pip.horse-on { background: #00cec9; border-color: #00b894; box-shadow: 0 0 3px #00cec9; }
+        .charge-pip.nitro-on { background: #00cec9; border-color: #00b894; box-shadow: 0 0 3px #00cec9; }
 
         /* --- Animations --- */
         .jet-beam {
@@ -178,12 +201,32 @@
             box-shadow: 0 0 10px #ff4500, 0 0 20px #ffa500; border-radius: 7px; z-index: 999;
             transform-origin: left center; pointer-events: none; opacity: 0; transition: opacity 0.1s;
         }
+        .nitro-trail {
+            position: absolute; height: 100%; width: 100%;
+            background: linear-gradient(to right, transparent, rgba(0, 206, 201, 0.8));
+            z-index: 5; pointer-events: none; opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        .storm-beam {
+            position: absolute; height: 40px; 
+            background: linear-gradient(90deg, rgba(200, 255, 255, 0.2), rgba(0, 255, 255, 0.6) 20%, rgba(255, 255, 255, 0.8) 50%, rgba(0, 255, 255, 0.6) 80%, rgba(200, 255, 255, 0.2));
+            box-shadow: 0 0 20px #00ffff, 0 0 40px rgba(138, 43, 226, 0.5);
+            z-index: 999; transform-origin: left center; pointer-events: none; opacity: 0; transition: opacity 0.2s;
+            mix-blend-mode: hard-light;
+        }
         .explosion-effect {
             position: absolute; width: 300%; height: 300%; top: -100%; left: -100%;
             background: radial-gradient(circle, rgba(255,69,0,0.8) 10%, rgba(255,165,0,0.6) 40%, rgba(0,0,0,0) 70%);
             z-index: 998; pointer-events: none; animation: explode 0.6s ease-out forwards; border-radius: 50%;
         }
+        .shockwave-effect {
+            position: absolute; width: 300%; height: 300%; top: -100%; left: -100%;
+            border: 15px solid rgba(46, 204, 113, 0.8); border-radius: 50%; box-sizing: border-box;
+            z-index: 998; pointer-events: none; animation: shockwave 0.5s ease-out forwards;
+        }
         @keyframes explode { 0% { transform: scale(0); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.2); opacity: 0; } }
+        @keyframes shockwave { 0% { transform: scale(0); opacity: 1; border-width: 20px; } 100% { transform: scale(1.2); opacity: 0; border-width: 0px; } }
+        
         .teleport-orb {
             position: absolute; border-radius: 50%;
             background: radial-gradient(circle, rgba(255,255,255,0.9) 10%, rgba(155, 89, 182, 0.8) 60%, rgba(142, 68, 173, 0) 70%);
@@ -203,17 +246,25 @@
         .highlight-dark-attack { background-color: var(--valid-dark-attack); box-shadow: inset 0 0 10px #d35400; }
         .highlight-skill-target { background-color: rgba(52, 152, 219, 0.6); box-shadow: inset 0 0 15px #3498db; cursor: crosshair; animation: pulse-blue 1s infinite; }
         .highlight-cannon-target { background-color: var(--valid-cannon-skill); box-shadow: inset 0 0 15px #e67e22; cursor: crosshair; animation: pulse-orange 1s infinite; }
+        .highlight-storm-target { background-color: var(--valid-storm-skill); box-shadow: inset 0 0 15px #8e44ad; cursor: pointer; animation: pulse-purple 1s infinite; }
+        .highlight-nitro-target { background-color: var(--valid-nitro-skill); box-shadow: inset 0 0 15px #00cec9; cursor: pointer; animation: pulse-cyan 1s infinite; }
         @keyframes pulse-blue { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
         @keyframes pulse-orange { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        @keyframes pulse-purple { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        @keyframes pulse-cyan { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
         .fail-shake { animation: shake 0.4s; }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 
-        /* --- Controls --- */
+        /* --- Controls Area --- */
+        /* Placed in flow at the bottom */
         #controls-area {
             flex: 0 0 auto;
             width: 100%;
-            background: rgba(30, 30, 30, 0.8); backdrop-filter: blur(5px);
-            border-top: 1px solid #555; padding: 8px;
+            background: rgba(30, 30, 30, 0.8);
+            backdrop-filter: blur(5px);
+            border-top: 1px solid #555;
+            padding: 8px;
+            padding-bottom: calc(8px + var(--safe-bottom));
             display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
             z-index: 100;
         }
@@ -227,7 +278,16 @@
         
         #btn-skill-jet { background: #3498db; }
         #btn-skill-cannon { background: #d35400; }
-        #btn-skill-jet.disabled, #btn-skill-cannon.disabled { background: #7f8c8d; opacity: 0.6; pointer-events: none; }
+        #btn-skill-storm { background: #8e44ad; }
+        #btn-skill-gold { background: #f1c40f; color: #333; }
+        #btn-skill-elephant { background: #27ae60; }
+        #btn-skill-nitro { background: #00cec9; color: #333; }
+        
+        #btn-skill-jet.disabled, #btn-skill-cannon.disabled, 
+        #btn-skill-storm.disabled, #btn-skill-gold.disabled, 
+        #btn-skill-elephant.disabled, #btn-skill-nitro.disabled { 
+            background: #7f8c8d; opacity: 0.6; pointer-events: none; color: #ccc;
+        }
         
         #btn-pawn-swap { background: #9b59b6; }
         #btn-pawn-rez { background: #f1c40f; color: #333; }
@@ -255,57 +315,60 @@
             white-space: nowrap; border: 2px solid #f1c40f;
         }
 
-        /* --- DESKTOP LAYOUT OVERRIDES --- */
+        /* --- DESKTOP LAYOUT (Horizontal) --- */
         @media (min-width: 768px) {
-            #game-layout {
-                flex-direction: row; /* Horizontal Layout */
+            #main-wrapper {
+                flex-direction: row; /* Horizontal layout for board and panels */
                 align-items: center;
                 justify-content: center;
-                padding: 20px;
                 max-width: 1200px;
+                height: 85vh; /* Reserve space for controls at bottom */
             }
 
             .side-panel {
                 width: 120px;
-                height: 80vh;
+                height: 100%;
                 justify-content: flex-start;
                 gap: 10px;
             }
 
-            /* Red Graveyard (Left) */
             #red-panel { order: 1; }
             
-            /* Board (Center) */
             .board-container { 
                 order: 2; 
                 flex: 1; 
-                height: 90vh; 
+                height: 100%;
                 padding: 0 20px;
-                display: flex; justify-content: center; align-items: center;
             }
 
             #board {
-                /* On desktop, height is usually the limiting factor */
-                height: 90%; 
-                max-height: 750px; /* Cap height so it doesn't get crazy */
-                width: auto; /* Width auto adjusts based on ratio */
+                height: 95%; /* Make it big but leave margin */
+                max-height: 750px;
+                width: auto;
             }
 
-            /* Black Graveyard (Right) */
             #black-panel { order: 3; }
 
             .graveyard-box {
                 width: 100%; height: auto; flex: 1;
-                flex-direction: column; /* Vertical stack */
-                align-items: center; justify-content: flex-start;
+                flex-direction: column; /* Stack pieces vertically */
+                flex-wrap: wrap; /* Grid like if too many pieces */
+                align-content: center; justify-content: flex-start;
                 overflow-y: auto; overflow-x: hidden;
                 padding: 10px 0;
             }
+            
+            .graveyard-piece { margin-bottom: 5px; }
 
             #controls-area {
-                position: absolute; bottom: 20px; width: auto;
-                background: transparent; border: none; padding: 0;
-                pointer-events: auto;
+                /* Keep controls at bottom in flow, separate from main-wrapper */
+                position: relative; 
+                width: 100%; 
+                height: 15vh;
+                min-height: 80px;
+                align-items: center;
+                background: transparent;
+                border-top: none;
             }
             .action-btn { font-size: 1rem; padding: 12px 20px; max-width: 200px; }
         }
@@ -316,7 +379,7 @@
 <div id="start-screen" class="screen">
     <h1>暗棋對決</h1>
     <button class="menu-btn" onclick="game.startGame('STANDARD')">經典連吃版</button>
-    <button class="menu-btn btn-blue" onclick="game.startGame('SPECIAL')">特殊模式：消防栓與火焰炮</button>
+    <button class="menu-btn btn-blue" onclick="game.startGame('SPECIAL')">特殊模式：全英雄大亂鬥</button>
 </div>
 
 <div id="game-over-screen" class="screen hidden-screen">
@@ -332,8 +395,12 @@
             <strong>能力：</strong>比將小、比士大<br>
             <strong>技能：</strong>水柱噴射、換位、復活<br>
             <hr style="margin:5px 0; border:0; border-top:1px solid #ccc;">
-            <strong>💥 炮兵新技能：</strong><br>
-            火焰噴射 (集滿5氣)：轟炸目標及周圍，需目標區有3棋以上。
+            <strong>💥 炮兵：</strong>火焰噴射 (5氣)<br>
+            <strong>🌪️ 將帥：</strong>風暴一字斬 (7氣)<br>
+            <strong>🛡️ 士仕：</strong>金剛不壞 (6氣)<br>
+            <strong>🐘 象相：</strong>象鼻橫掃 (5氣)<br>
+            <strong>🐎 馬傌：</strong>八方奔馳 (1氣)<br>
+            <strong>🏎️ 車俥：</strong>氮氣加速 (3氣)
         </div>
         <div class="modal-btns">
             <button class="action-btn btn-green" style="display:flex; background:#2ecc71;" onclick="game.confirmPromotion(true)">✅ 穿裝備</button>
@@ -342,31 +409,29 @@
     </div>
 </div>
 
-<!-- Main Layout Structure -->
-<div id="game-layout">
-    
-    <!-- Red Side (Top on Mobile, Left on Desktop) -->
+<!-- Flex Wrapper for responsive layout -->
+<div id="main-wrapper">
     <div class="side-panel" id="red-panel">
         <div id="status-bar"><div id="turn-display" class="turn-indicator">準備開始</div></div>
         <div class="graveyard-box" id="graveyard-red-strip"></div>
     </div>
-
-    <!-- Board Area -->
+    
     <div class="board-container">
         <div id="board"></div>
     </div>
-
-    <!-- Black Side (Bottom on Mobile, Right on Desktop) -->
+    
     <div class="side-panel" id="black-panel">
         <div class="graveyard-box" id="graveyard-black-strip"></div>
     </div>
-
 </div>
 
-<!-- Controls Floating/Fixed -->
 <div id="controls-area">
     <button id="btn-skill-jet" class="action-btn" onclick="game.activateSkill('JET')">🌊 水柱噴射</button>
     <button id="btn-skill-cannon" class="action-btn" onclick="game.activateSkill('CANNON_FIRE')">🔥 火焰噴射</button>
+    <button id="btn-skill-storm" class="action-btn" onclick="game.activateSkill('STORM_SLASH')">🌪️ 風暴一字斬</button>
+    <button id="btn-skill-gold" class="action-btn" onclick="game.activateSkill('GOLDEN_BODY')">🛡️ 金剛不壞</button>
+    <button id="btn-skill-elephant" class="action-btn" onclick="game.activateSkill('ELEPHANT_SWEEP')">🐘 象鼻橫掃</button>
+    <button id="btn-skill-nitro" class="action-btn" onclick="game.activateSkill('NITRO')">🏎️ 氮氣加速</button>
     
     <button id="btn-pawn-swap" class="action-btn" onclick="game.pawnAction('SWAP')">🔄 與大哥換位</button>
     <button id="btn-pawn-rez" class="action-btn" onclick="game.pawnAction('RESURRECT')">⚰️ 犧牲召喚</button>
@@ -399,6 +464,9 @@
         error: () => Sound.play(80, 'sawtooth', 0.2),
         fail: () => { Sound.play(150, 'sawtooth', 0.1); setTimeout(()=>Sound.play(100, 'sawtooth', 0.1), 100); },
         skill: () => { [400, 600, 800].forEach((f,i) => setTimeout(()=>Sound.play(f,'sine',0.2), i*100)); },
+        metal: () => { Sound.play(200, 'square', 0.05, 0.2); setTimeout(()=>Sound.play(150, 'square', 0.1, 0.2), 50); },
+        heavy: () => { Sound.play(100, 'square', 0.3, 0.3); },
+        bounce: () => { Sound.play(200, 'triangle', 0.1); setTimeout(()=>Sound.play(300, 'triangle', 0.2), 100); },
         jet: () => {
              if(audioCtx.state === 'suspended') audioCtx.resume();
              const bufferSize = audioCtx.sampleRate * 0.5;
@@ -409,6 +477,23 @@
              const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.3, audioCtx.currentTime); 
              gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+0.5);
              noise.connect(gain); gain.connect(audioCtx.destination); noise.start();
+        },
+        storm: () => {
+             if(audioCtx.state === 'suspended') audioCtx.resume();
+             const bufferSize = audioCtx.sampleRate * 1.5;
+             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+             const data = buffer.getChannelData(0);
+             for(let i=0; i<bufferSize; i++) data[i] = (Math.random() * 2 - 1);
+             const noise = audioCtx.createBufferSource(); noise.buffer = buffer;
+             const gain = audioCtx.createGain();
+             const filter = audioCtx.createBiquadFilter();
+             filter.type = "bandpass"; filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+             filter.frequency.linearRampToValueAtTime(1000, audioCtx.currentTime + 1.5);
+             gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+             gain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.2); 
+             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+1.5);
+             noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination); 
+             noise.start();
         },
         explosion: () => {
              if(audioCtx.state === 'suspended') audioCtx.resume();
@@ -478,8 +563,9 @@
 
         init() {
             let pool = [];
-            PIECES.RED.forEach(p => { for(let i=0; i<p.c; i++) pool.push({...p, color:'red', revealed:false, isFF:false, charge:0}); });
-            PIECES.BLACK.forEach(p => { for(let i=0; i<p.c; i++) pool.push({...p, color:'black', revealed:false, isFF:false, charge:0}); });
+            // Init pieces. invT = invincibleTurns
+            PIECES.RED.forEach(p => { for(let i=0; i<p.c; i++) pool.push({...p, color:'red', revealed:false, isFF:false, charge:0, invincibleTurns:0}); });
+            PIECES.BLACK.forEach(p => { for(let i=0; i<p.c; i++) pool.push({...p, color:'black', revealed:false, isFF:false, charge:0, invincibleTurns:0}); });
             
             for(let i=pool.length-1; i>0; i--){
                 const j = Math.floor(Math.random()*(i+1));
@@ -520,7 +606,6 @@
             const boardEl = document.getElementById('board');
             boardEl.innerHTML = '';
             
-            // Dynamic font sizing
             const updateFontSize = () => {
                 const cell = boardEl.firstElementChild;
                 if(cell) {
@@ -537,8 +622,11 @@
                 cell.onclick = () => this.handleCellClick(idx);
                 
                 if(p) {
+                    let classes = `piece ${p.color} ${p.revealed ? '':'hidden'} ${p.isFF ? 'firefighter':''}`;
+                    if (p.invincibleTurns > 0) classes += ' invincible';
+                    
                     const el = document.createElement('div');
-                    el.className = `piece ${p.color} ${p.revealed ? '':'hidden'} ${p.isFF ? 'firefighter':''}`;
+                    el.className = classes;
                     el.id = `piece-${idx}`;
                     
                     if(p.revealed) {
@@ -551,6 +639,11 @@
                         let maxCharge = 0;
                         if (p.isFF) maxCharge = 3;
                         else if (p.r === 2 && this.mode === 'SPECIAL') maxCharge = 5;
+                        else if (p.r === 7 && this.mode === 'SPECIAL') maxCharge = 7;
+                        else if (p.r === 6 && this.mode === 'SPECIAL') maxCharge = 6;
+                        else if (p.r === 5 && this.mode === 'SPECIAL') maxCharge = 5;
+                        else if (p.r === 4 && this.mode === 'SPECIAL') maxCharge = 3; // Rook
+                        else if (p.r === 3 && this.mode === 'SPECIAL') maxCharge = 1;
 
                         if(maxCharge > 0) {
                             const bar = document.createElement('div');
@@ -559,6 +652,11 @@
                                 const pip = document.createElement('div');
                                 let onClass = 'on';
                                 if (p.r === 2) onClass = 'cannon-on';
+                                if (p.r === 7) onClass = 'storm-on';
+                                if (p.r === 6) onClass = 'gold-on';
+                                if (p.r === 5) onClass = 'elephant-on';
+                                if (p.r === 3) onClass = 'horse-on';
+                                if (p.r === 4) onClass = 'nitro-on';
                                 pip.className = `charge-pip ${i < p.charge ? onClass:''}`;
                                 bar.appendChild(pip);
                             }
@@ -570,8 +668,6 @@
                 }
                 boardEl.appendChild(cell);
             });
-            
-            // Trigger font resize after render
             requestAnimationFrame(updateFontSize);
         }
 
@@ -579,15 +675,11 @@
             if(this.gameOver || this.animating) return;
             const p = this.board[idx];
 
-            if(this.skillMode === 'JET') {
-                this.executeJetSkill(idx);
-                return;
-            }
-
-            if(this.skillMode === 'CANNON_FIRE') {
-                this.executeCannonSkill(idx);
-                return;
-            }
+            if(this.skillMode === 'JET') { this.executeJetSkill(idx); return; }
+            if(this.skillMode === 'CANNON_FIRE') { this.executeCannonSkill(idx); return; }
+            if(this.skillMode === 'STORM_SLASH') { this.executeStormSkill(idx); return; }
+            if(this.skillMode === 'ELEPHANT_SWEEP') { this.executeElephantSkill(); return; }
+            if(this.skillMode === 'NITRO') { this.executeNitroSkill(idx); return; }
 
             if(this.isChainCapturing) {
                 if(idx === this.chainIdx) return;
@@ -639,7 +731,12 @@
                     } else {
                         Sound.error();
                         this.shakePiece(this.selectedIdx);
-                        this.showMsg("打不過！");
+                        if(p.invincibleTurns > 0) {
+                            Sound.metal();
+                            this.showMsg("金剛不壞！無法攻擊");
+                        } else {
+                            this.showMsg("打不過！");
+                        }
                     }
                 } else {
                     this.cancelAction();
@@ -730,6 +827,11 @@
             if(this.mode === 'SPECIAL') {
                 const jetBtn = document.getElementById('btn-skill-jet');
                 const cannonBtn = document.getElementById('btn-skill-cannon');
+                const stormBtn = document.getElementById('btn-skill-storm');
+                const goldBtn = document.getElementById('btn-skill-gold');
+                const elephantBtn = document.getElementById('btn-skill-elephant');
+                const nitroBtn = document.getElementById('btn-skill-nitro');
+                
                 const swapBtn = document.getElementById('btn-pawn-swap');
                 const rezBtn = document.getElementById('btn-pawn-rez');
                 const equipBtn = document.getElementById('btn-pawn-equip');
@@ -757,6 +859,50 @@
                     }
                     cancelBtn.style.display = 'flex';
                 }
+                else if (p.r === 7) { 
+                    stormBtn.style.display = 'flex';
+                    if (p.charge < 7) {
+                        stormBtn.classList.add('disabled');
+                        stormBtn.innerText = `集氣中 (${p.charge}/7)`;
+                    } else {
+                        stormBtn.classList.remove('disabled');
+                        stormBtn.innerText = `🌪️ 風暴一字斬 (READY)`;
+                    }
+                    cancelBtn.style.display = 'flex';
+                }
+                else if (p.r === 6) { 
+                    goldBtn.style.display = 'flex';
+                    if (p.charge < 6) {
+                        goldBtn.classList.add('disabled');
+                        goldBtn.innerText = `集氣中 (${p.charge}/6)`;
+                    } else {
+                        goldBtn.classList.remove('disabled');
+                        goldBtn.innerText = `🛡️ 金剛不壞 (READY)`;
+                    }
+                    cancelBtn.style.display = 'flex';
+                }
+                else if (p.r === 5) { 
+                    elephantBtn.style.display = 'flex';
+                    if (p.charge < 5) {
+                        elephantBtn.classList.add('disabled');
+                        elephantBtn.innerText = `集氣中 (${p.charge}/5)`;
+                    } else {
+                        elephantBtn.classList.remove('disabled');
+                        elephantBtn.innerText = `🐘 象鼻橫掃 (READY)`;
+                    }
+                    cancelBtn.style.display = 'flex';
+                }
+                else if (p.r === 4) { // Rook
+                    nitroBtn.style.display = 'flex';
+                    if (p.charge < 3) {
+                        nitroBtn.classList.add('disabled');
+                        nitroBtn.innerText = `集氣中 (${p.charge}/3)`;
+                    } else {
+                        nitroBtn.classList.remove('disabled');
+                        nitroBtn.innerText = `🏎️ 氮氣加速 (READY)`;
+                    }
+                    cancelBtn.style.display = 'flex';
+                }
                 else if (p.r === 1) { 
                     const hasFF = this.hasFirefighterOnBoard(p.color);
                     const hasDeadFF = this.hasFirefighterInGraveyard(p.color);
@@ -778,6 +924,22 @@
                 this.skillMode = 'CANNON_FIRE';
                 this.highlightCannonTargets();
                 document.getElementById('btn-skill-cannon').style.display = 'none';
+            }
+            else if (type === 'STORM_SLASH') {
+                this.skillMode = 'STORM_SLASH';
+                this.highlightStormTargets();
+                document.getElementById('btn-skill-storm').style.display = 'none';
+            }
+            else if (type === 'GOLDEN_BODY') {
+                this.executeGoldenBody();
+            }
+            else if (type === 'ELEPHANT_SWEEP') {
+                this.executeElephantSkill();
+            }
+            else if (type === 'NITRO') {
+                this.skillMode = 'NITRO';
+                this.highlightNitroTargets();
+                document.getElementById('btn-skill-nitro').style.display = 'none';
             }
         }
 
@@ -820,6 +982,8 @@
             }
         }
 
+        // --- Targeting Logic ---
+
         highlightJetTargets() {
             const cells = document.getElementById('board').children;
             const origin = this.selectedIdx;
@@ -854,6 +1018,52 @@
                 }
             }
         }
+
+        highlightStormTargets() {
+            const cells = document.getElementById('board').children;
+            const origin = this.selectedIdx;
+            const ox=origin%4, oy=Math.floor(origin/4);
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+            this.showMsg("選擇方向施放風暴 (敵我不分)");
+
+            dirs.forEach(d => {
+                let cx=ox+d[0], cy=oy+d[1];
+                while(cx>=0 && cx<4 && cy>=0 && cy<8) {
+                    const idx = cy*4+cx;
+                    const p = this.board[idx];
+                    if(p) {
+                        if (!p.revealed || p.color !== this.turn) {
+                            cells[idx].classList.add('highlight-storm-target');
+                        }
+                    }
+                    cx+=d[0]; cy+=d[1];
+                }
+            });
+        }
+
+        highlightNitroTargets() {
+            const cells = document.getElementById('board').children;
+            const origin = this.selectedIdx;
+            const ox=origin%4, oy=Math.floor(origin/4);
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]]; // Orthogonal only
+            this.showMsg("選擇衝刺方向 (需有棋子)");
+
+            dirs.forEach(d => {
+                let cx=ox+d[0], cy=oy+d[1];
+                while(cx>=0 && cx<4 && cy>=0 && cy<8) {
+                    const idx = cy*4+cx;
+                    const p = this.board[idx];
+                    if(p) {
+                        // Found first piece in this direction
+                        cells[idx].classList.add('highlight-nitro-target');
+                        break; 
+                    }
+                    cx+=d[0]; cy+=d[1];
+                }
+            });
+        }
+
+        // --- Animations ---
 
         createOrb(cell) {
             const r = cell.getBoundingClientRect();
@@ -916,6 +1126,47 @@
                 setTimeout(() => { beam.style.opacity = 0; setTimeout(() => { if(beam.parentNode) beam.remove(); }, 200); }, 300);
             });
         }
+
+        showStormAnimation(fromIdx, targetIdx, callback) {
+            this.animating = true;
+            const board = document.getElementById('board');
+            const cell1 = document.getElementById('cell-' + fromIdx);
+            const cell2 = document.getElementById('cell-' + targetIdx);
+            
+            const r1 = cell1.getBoundingClientRect();
+            const r2 = cell2.getBoundingClientRect();
+            const boardR = board.getBoundingClientRect();
+
+            const x1 = r1.left + r1.width/2 - boardR.left;
+            const y1 = r1.top + r1.height/2 - boardR.top;
+            
+            const dx = (r2.left + r2.width/2) - (r1.left + r1.width/2);
+            const dy = (r2.top + r2.height/2) - (r1.top + r1.height/2);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            const length = Math.hypot(boardR.width, boardR.height) * 1.5;
+
+            const beam = document.createElement('div');
+            beam.className = 'storm-beam';
+            beam.style.width = length + 'px';
+            beam.style.left = x1 + 'px';
+            beam.style.top = y1 + 'px';
+            beam.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+
+            board.appendChild(beam);
+            Sound.storm();
+
+            requestAnimationFrame(() => {
+                beam.style.opacity = 1;
+                setTimeout(() => { 
+                    beam.style.opacity = 0; 
+                    setTimeout(() => { 
+                        if(beam.parentNode) beam.remove();
+                        this.animating = false;
+                        if(callback) callback();
+                    }, 200); 
+                }, 500);
+            });
+        }
         
         showResurrectAnimation(idx, callback) {
             this.animating = true;
@@ -947,6 +1198,270 @@
             setTimeout(() => { exp.remove(); this.animating = false; if(callback) callback(); }, 700);
         }
 
+        showShockwaveAnimation(centerIdx, callback) {
+            this.animating = true;
+            const board = document.getElementById('board');
+            const cell = document.getElementById('cell-' + centerIdx);
+            const r = cell.getBoundingClientRect();
+            const boardR = board.getBoundingClientRect();
+            
+            const size = r.width * 3;
+            const wave = document.createElement('div');
+            wave.className = 'shockwave-effect';
+            wave.style.width = size + 'px'; wave.style.height = size + 'px';
+            wave.style.left = (r.left - boardR.left + r.width/2 - size/2) + 'px';
+            wave.style.top = (r.top - boardR.top + r.height/2 - size/2) + 'px';
+            
+            board.appendChild(wave);
+            Sound.heavy();
+            
+            setTimeout(() => { wave.remove(); this.animating = false; if(callback) callback(); }, 500);
+        }
+
+        showNitroAnimation(fromIdx, dirIdx) {
+            const board = document.getElementById('board');
+            const cell1 = document.getElementById('cell-' + fromIdx);
+            const cell2 = document.getElementById('cell-' + dirIdx); 
+            if(!cell1 || !cell2) return;
+
+            const r1 = cell1.getBoundingClientRect();
+            const r2 = cell2.getBoundingClientRect();
+            const boardR = board.getBoundingClientRect();
+            
+            const x1 = r1.left + r1.width/2 - boardR.left;
+            const y1 = r1.top + r1.height/2 - boardR.top;
+            const dx = (r2.left + r2.width/2) - (r1.left + r1.width/2);
+            const dy = (r2.top + r2.height/2) - (r1.top + r1.height/2);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+            const beam = document.createElement('div');
+            beam.className = 'jet-beam';
+            beam.style.background = 'linear-gradient(90deg, rgba(0, 206, 201, 0.9), rgba(255,255,255,0))';
+            beam.style.boxShadow = '0 0 15px #00cec9';
+            beam.style.width = '1000px'; 
+            beam.style.left = x1 + 'px';
+            beam.style.top = y1 + 'px';
+            beam.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+            
+            board.appendChild(beam);
+            requestAnimationFrame(() => {
+                beam.style.opacity = 1;
+                setTimeout(() => { beam.style.opacity = 0; setTimeout(() => beam.remove(), 200); }, 300);
+            });
+        }
+
+        showBounceAnimation(fromIdx) {
+            this.shakePiece(fromIdx);
+            Sound.bounce();
+        }
+
+        // --- Executions ---
+
+        executeGoldenBody() {
+            const p = this.board[this.selectedIdx];
+            p.invincibleTurns = 4; // 2 Rounds = 4 half-turns
+            p.charge = 0;
+            Sound.metal();
+            this.showMsg("金剛不壞！啟動！");
+            this.render();
+            this.endTurn();
+        }
+
+        executeElephantSkill() {
+            const originIdx = this.selectedIdx;
+            const cx = originIdx % 4;
+            const cy = Math.floor(originIdx / 4);
+            const affectedIndices = [];
+            let validTargets = 0;
+
+            for(let dy=-1; dy<=1; dy++) {
+                for(let dx=-1; dx<=1; dx++) {
+                    if (dx===0 && dy===0) continue;
+                    const nx=cx+dx, ny=cy+dy;
+                    if(nx>=0 && nx<4 && ny>=0 && ny<8) {
+                        const idx = ny*4+nx;
+                        const p = this.board[idx];
+                        if (p) {
+                            affectedIndices.push(idx);
+                            if (!p.revealed || p.color !== this.turn) {
+                                validTargets++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (validTargets === 0) {
+                Sound.fail();
+                this.showMsg("沒有敵方！");
+                return;
+            }
+
+            this.showShockwaveAnimation(originIdx, () => {
+                const attacker = this.board[originIdx];
+                affectedIndices.forEach(idx => {
+                    const p = this.board[idx];
+                    if(!p) return;
+                    
+                    let destroyed = false;
+                    if(p.revealed) { destroyed = true; } // Destroy all revealed (including ally)
+                    else { 
+                        p.revealed = true; // Reveal hidden
+                        if(p.color !== attacker.color) destroyed = true; // Destroy enemy
+                    }
+                    
+                    if(p.invincibleTurns > 0) destroyed = false; // Immunity
+
+                    if(destroyed) {
+                        this.addToGraveyard(p);
+                        this.board[idx] = null;
+                    }
+                });
+                attacker.charge = 0;
+                this.render();
+                this.endTurn();
+            });
+        }
+
+        executeNitroSkill(targetIdx) {
+            const cells = document.getElementById('board').children;
+            if(!cells[targetIdx].classList.contains('highlight-nitro-target')) {
+                Sound.error(); return;
+            }
+
+            // Direction Logic
+            const originIdx = this.selectedIdx;
+            const cx = originIdx % 4; const cy = Math.floor(originIdx / 4);
+            const tx = targetIdx % 4; const ty = Math.floor(targetIdx / 4);
+            let dx = tx - cx; let dy = ty - cy;
+            if(dx!==0) dx /= Math.abs(dx);
+            if(dy!==0) dy /= Math.abs(dy);
+
+            // Collect pieces in path starting from targetIdx
+            const piecesToPush = [];
+            let currX = tx, currY = ty;
+            while(currX >= 0 && currX < 4 && currY >= 0 && currY < 8) {
+                const idx = currY * 4 + currX;
+                if(this.board[idx]) piecesToPush.push(this.board[idx]);
+                currX += dx; currY += dy;
+            }
+
+            // Corrected Logic: Calculate available slots FROM target index
+            let availableSlots = 0;
+            let checkX = tx, checkY = ty;
+            while(checkX >= 0 && checkX < 4 && checkY >= 0 && checkY < 8) {
+                availableSlots++; 
+                checkX += dx; checkY += dy;
+            }
+
+            const rook = this.board[originIdx];
+            // We need space for Rook + all pieces to push
+            // Example: [Rook] -> [P1][P2][Empty] (Edge)
+            // Target is P1. Available from P1 is 3 slots.
+            // Pieces = P1, P2 (2 pieces). 
+            // Need 1 (Rook) + 2 (Pieces) = 3 slots. 3 <= 3 OK.
+            const neededSpace = piecesToPush.length + 1; 
+
+            // Case: Bounce (Not enough space)
+            if (neededSpace > availableSlots) {
+                // Bounce to opposite end
+                let bounceX = cx, bounceY = cy;
+                let bestX = cx, bestY = cy;
+                // Reverse direction
+                const rdx = -dx, rdy = -dy;
+                
+                while(true) {
+                    const nx = bounceX + rdx;
+                    const ny = bounceY + rdy;
+                    if(nx < 0 || nx >= 4 || ny < 0 || ny >= 8) break;
+                    if(this.board[ny*4+nx]) break; // Hit a piece behind
+                    bounceX = nx; bounceY = ny;
+                    bestX = nx; bestY = ny;
+                }
+
+                this.showBounceAnimation(originIdx);
+                const destIdx = bestY * 4 + bestX;
+                
+                if (destIdx !== originIdx) {
+                    this.board[destIdx] = rook;
+                    this.board[originIdx] = null;
+                }
+                
+                this.showMsg("撞牆反彈！(不耗氣)");
+                this.render();
+                this.endTurn(); // Don't reset charge
+            } 
+            else {
+                // Case: Success Push
+                Sound.jet();
+                this.showNitroAnimation(originIdx, targetIdx);
+
+                // Safe Move: First, gather data, then clear board, then place.
+                // Prevents overwriting issues.
+                
+                // 1. Remove Rook from origin
+                this.board[originIdx] = null;
+
+                // 2. Remove all pushed pieces from board temporarily
+                // Note: We already have them in `piecesToPush` array
+                let clearX = tx, clearY = ty;
+                while(clearX >= 0 && clearX < 4 && clearY >= 0 && clearY < 8) {
+                    const idx = clearY * 4 + clearX;
+                    this.board[idx] = null; 
+                    clearX += dx; clearY += dy;
+                }
+
+                // 3. Determine Edge coordinates
+                let edgeX = cx, edgeY = cy;
+                while(true) {
+                    const nx = edgeX + dx, ny = edgeY + dy;
+                    if(nx < 0 || nx >= 4 || ny < 0 || ny >= 8) break;
+                    edgeX = nx; edgeY = ny;
+                }
+
+                // 4. Place Pieces from Edge Backwards
+                let placeX = edgeX, placeY = edgeY;
+                
+                // Reverse iterate piecesToPush (Farthest piece goes to Edge)
+                // piecesToPush is [Near...Far] relative to Rook.
+                // So piecesToPush[last] is Farthest. It goes to Edge.
+                for(let i=piecesToPush.length-1; i>=0; i--) {
+                    const p = piecesToPush[i];
+                    
+                    // Reveal & Destroy Logic
+                    let destroyed = false;
+                    if(!p.revealed) {
+                        p.revealed = true;
+                        // Destroy if enemy Rank < 4 (Car)
+                        if(p.color !== rook.color && p.r < 4) {
+                            destroyed = true;
+                        }
+                    }
+                    
+                    if(p.invincibleTurns > 0) destroyed = false;
+
+                    if(destroyed) {
+                        this.addToGraveyard(p);
+                    } else {
+                        const idx = placeY * 4 + placeX;
+                        this.board[idx] = p;
+                        placeX -= dx; placeY -= dy;
+                    }
+                }
+
+                // 5. Finally, Place Rook at Target (which is cleared or empty now)
+                // But wait! If targetIdx was occupied by P1, P1 moved back.
+                // So targetIdx is now free for Rook.
+                this.board[targetIdx] = rook;
+
+                rook.charge = 0;
+                setTimeout(() => {
+                    this.render();
+                    this.endTurn();
+                }, 300);
+            }
+        }
+
         executeJetSkill(idx) {
             const cells = document.getElementById('board').children;
             if(cells[idx].classList.contains('highlight-skill-target')) {
@@ -956,8 +1471,15 @@
                 setTimeout(() => {
                     this.animating = false;
                     const victim = this.board[idx];
-                    this.addToGraveyard(victim);
-                    this.board[idx] = null;
+                    
+                    // IMMUNITY CHECK
+                    if (victim.invincibleTurns > 0) {
+                        Sound.metal();
+                    } else {
+                        this.addToGraveyard(victim);
+                        this.board[idx] = null;
+                    }
+                    
                     this.board[this.selectedIdx].charge = 0;
                     this.render();
                     this.endTurn();
@@ -1007,9 +1529,13 @@
                     affectedIndices.forEach(idx => {
                         const p = this.board[idx];
                         if(!p) return;
+                        
                         let destroyed = false;
                         if(p.revealed) { destroyed = true; } 
                         else { p.revealed = true; if(p.color !== attacker.color) destroyed = true; }
+                        
+                        if(p.invincibleTurns > 0) destroyed = false;
+
                         if(destroyed) { this.addToGraveyard(p); this.board[idx] = null; }
                     });
                     attacker.charge = 0;
@@ -1019,10 +1545,63 @@
             }, 300);
         }
 
+        executeStormSkill(targetIdx) {
+            const cells = document.getElementById('board').children;
+            if (!cells[targetIdx].classList.contains('highlight-storm-target')) {
+                Sound.error(); return;
+            }
+
+            const originIdx = this.selectedIdx;
+            const ox = originIdx % 4;
+            const oy = Math.floor(originIdx / 4);
+            const tx = targetIdx % 4;
+            const ty = Math.floor(targetIdx / 4);
+
+            let dx = tx - ox;
+            let dy = ty - oy;
+            if(dx !== 0) dx = dx / Math.abs(dx);
+            if(dy !== 0) dy = dy / Math.abs(dy);
+
+            this.showStormAnimation(originIdx, targetIdx, () => {
+                const attacker = this.board[originIdx];
+                let cx = ox + dx;
+                let cy = oy + dy;
+
+                while(cx >= 0 && cx < 4 && cy >= 0 && cy < 8) {
+                    const idx = cy * 4 + cx;
+                    const p = this.board[idx];
+                    
+                    if(p) {
+                        let destroyed = false;
+                        if (!p.revealed) p.revealed = true;
+                        if (p.color !== attacker.color) destroyed = true;
+                        
+                        if(p.invincibleTurns > 0) destroyed = false;
+
+                        if(destroyed) {
+                            this.addToGraveyard(p);
+                            this.board[idx] = null;
+                        }
+                    }
+                    cx += dx; cy += dy;
+                }
+
+                attacker.charge = 0;
+                this.render();
+                this.endTurn();
+            });
+        }
+
         executeMove(from, to) {
             const p = this.board[from];
             if(p.isFF && p.charge < 3) p.charge++;
             if(p.r === 2 && this.mode === 'SPECIAL' && p.charge < 5) p.charge++;
+            if(p.r === 7 && this.mode === 'SPECIAL' && p.charge < 7) p.charge++;
+            if(p.r === 6 && this.mode === 'SPECIAL' && p.charge < 6) p.charge++;
+            if(p.r === 5 && this.mode === 'SPECIAL' && p.charge < 5) p.charge++;
+            if(p.r === 4 && this.mode === 'SPECIAL' && p.charge < 3) p.charge++;
+            if(p.r === 3 && this.mode === 'SPECIAL' && p.charge < 1) p.charge++;
+
             this.board[to] = p;
             this.board[from] = null;
             Sound.move();
@@ -1034,6 +1613,11 @@
             const attacker = this.board[from];
             if(attacker.isFF && attacker.charge < 3) attacker.charge++;
             if(attacker.r === 2 && this.mode === 'SPECIAL' && attacker.charge < 5) attacker.charge++;
+            if(attacker.r === 7 && this.mode === 'SPECIAL' && attacker.charge < 7) attacker.charge++;
+            if(attacker.r === 6 && this.mode === 'SPECIAL' && attacker.charge < 6) attacker.charge++;
+            if(attacker.r === 5 && this.mode === 'SPECIAL' && attacker.charge < 5) attacker.charge++;
+            if(attacker.r === 4 && this.mode === 'SPECIAL' && attacker.charge < 3) attacker.charge++;
+            if(attacker.r === 3 && this.mode === 'SPECIAL' && attacker.charge < 1) attacker.charge++;
 
             if(isDark) {
                 const target = this.board[to];
@@ -1044,7 +1628,16 @@
                 }
                 let canKill = this.canPieceKill(attacker, target);
                 if(canKill) setTimeout(() => this.performCapture(from, to), 500);
-                else { Sound.fail(); this.shakePiece(from); this.showMsg("打不過"); setTimeout(() => this.endTurn(), 500); }
+                else { 
+                    Sound.fail(); 
+                    this.shakePiece(from); 
+                    if(target.invincibleTurns > 0) {
+                        Sound.metal(); this.showMsg("金剛不壞！無法攻擊");
+                    } else {
+                        this.showMsg("打不過"); 
+                    }
+                    setTimeout(() => this.endTurn(), 500); 
+                }
             } else {
                 this.performCapture(from, to);
             }
@@ -1052,6 +1645,10 @@
 
         performCapture(from, to) {
             const victim = this.board[to];
+            if(victim.invincibleTurns > 0) {
+                Sound.metal(); this.showMsg("金剛不壞！無法攻擊"); return;
+            }
+
             const killer = this.board[from];
             this.addToGraveyard(victim);
             Sound.capture();
@@ -1080,6 +1677,8 @@
         }
 
         canPieceKill(attacker, target) {
+            if (target.invincibleTurns > 0) return false;
+
             if(attacker.isFF) return target.r !== 7;
             if(target.isFF) return attacker.r === 7 || attacker.r === 2; 
             if(attacker.r === 2) return true; 
@@ -1107,7 +1706,19 @@
                     else { for(let k=minY+1;k<maxY;k++) if(this.board[k*4+x1]) screens++; }
                     if(screens === 1) reachable = true;
                 }
-            } else { if(dist === 1) reachable = true; }
+            } else { 
+                // Normal distance check
+                if(dist === 1) reachable = true; 
+                
+                // Horse Diagonal Ability (Rank 3, Charge >= 1)
+                if (attacker.r === 3 && attacker.charge >= 1) {
+                    const x1=from%4, y1=Math.floor(from/4);
+                    const x2=to%4, y2=Math.floor(to/4);
+                    if (Math.abs(x1-x2) <= 1 && Math.abs(y1-y2) <= 1) {
+                        reachable = true;
+                    }
+                }
+            }
 
             if(!reachable) return {reachable:false};
             if(isDark) return {reachable:true, valid:true, isDark:true};
@@ -1116,7 +1727,18 @@
         }
 
         getDist(i1, i2) { return Math.abs((i1%4)-(i2%4)) + Math.abs(Math.floor(i1/4)-Math.floor(i2/4)); }
-        isAdjacent(i1, i2) { return this.getDist(i1, i2) === 1; }
+        
+        isAdjacent(i1, i2) { 
+            const p = this.board[i1];
+            const x1=i1%4, y1=Math.floor(i1/4);
+            const x2=i2%4, y2=Math.floor(i2/4);
+            if (Math.abs(x1-x2) + Math.abs(y1-y2) === 1) return true;
+            if (p && p.r === 3 && p.charge >= 1) {
+                if (Math.abs(x1-x2) <= 1 && Math.abs(y1-y2) <= 1) return true;
+            }
+            return false;
+        }
+        
         shakePiece(idx) { const el = document.getElementById(`piece-${idx}`); if(el) { el.classList.remove('fail-shake'); void el.offsetWidth; el.classList.add('fail-shake'); } }
 
         addToGraveyard(p) {
@@ -1148,6 +1770,11 @@
         resetControls() {
             document.getElementById('btn-skill-jet').style.display = 'none';
             document.getElementById('btn-skill-cannon').style.display = 'none';
+            document.getElementById('btn-skill-storm').style.display = 'none';
+            document.getElementById('btn-skill-gold').style.display = 'none';
+            document.getElementById('btn-skill-elephant').style.display = 'none';
+            document.getElementById('btn-skill-nitro').style.display = 'none';
+            
             document.getElementById('btn-pawn-swap').style.display = 'none';
             document.getElementById('btn-pawn-rez').style.display = 'none';
             document.getElementById('btn-pawn-equip').style.display = 'none';
@@ -1163,6 +1790,10 @@
         }
 
         endTurn() {
+            this.board.forEach(p => {
+                if (p && p.invincibleTurns > 0) p.invincibleTurns--;
+            });
+
             this.selectedIdx = -1;
             this.isChainCapturing = false;
             this.chainIdx = -1;
@@ -1209,3 +1840,4 @@
 </script>
 </body>
 </html>
+
